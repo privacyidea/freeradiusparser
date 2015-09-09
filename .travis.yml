@@ -7,5 +7,10 @@ install:
   - "pip install ."
   - "pip install pytest"
   - "pip install pytest-cov"
+  - "pip install coveralls"
 # command to run tests
 script: "py.test --cov-report=html --cov=freeradiusparser"
+
+after_success:
+    coveralls --rcfile=coveragerc
+

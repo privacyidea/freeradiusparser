@@ -1,4 +1,6 @@
 [![Build Status](https://travis-ci.org/privacyidea/freeradiusparser.svg?branch=master)](https://travis-ci.org/privacyidea/freeradiusparser)
+[![Coverage Status](https://img.shields.io/coveralls/privacyidea/freeradiusparser.svg)](https://coveralls.io/r/privacyidea/freeradiusparser)
+
 
 # FreeRADIUS clients.conf parser
 
