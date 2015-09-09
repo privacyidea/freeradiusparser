@@ -7,7 +7,8 @@ from pyparsing import pythonStyleComment, Regex
 
 
 class BaseParser(object):
-    
+
+
     def get(self):
         """
         return the grouped config
@@ -28,7 +29,7 @@ class BaseParser(object):
         return ret
     
     def dump(self):
-        conf = self.get()
+        conf = self.get() or {}
         for client in conf:
             print "%s: %s" % (client[0], client[1])
 
@@ -39,8 +40,6 @@ class BaseParser(object):
         return
     
     def save(self, dict_config=None, outfile=None):
-        if not outfile:
-            outfile = self.file
         if dict_config:
             output = self.format(dict_config)
             f = codecs.open(outfile, 'w', 'utf-8')
@@ -198,13 +197,3 @@ class UserConfParser(BaseParser):
             output += "\n"
         return output
         
-
-def main():  # pragma: no cover
-    CP = ClientConfParser()
-    config = CP.get_dict()
-    # Here we could mangle with the config...
-    CP.save(config, infile="/etc/freeradius/clients.conf.new")
-    
-
-if __name__ == '__main__':
-    main()

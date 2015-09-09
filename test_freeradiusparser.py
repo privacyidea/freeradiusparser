@@ -21,8 +21,7 @@ import logging
 log = logging.getLogger(__name__)
 import unittest
 import os
-from freeradiusparser import ClientConfParser
-from freeradiusparser import UserConfParser
+from freeradiusparser import ClientConfParser, UserConfParser, BaseParser
 
 CLIENT_CONF = """# This is a client.conf for freeradius
 client localhost {
@@ -408,6 +407,23 @@ DEFAULT Hint == "SLIP"
 """
 
 
+class TestBaseParser(unittest.TestCase):
+
+    def test_base_parser(self):
+        bp = BaseParser()
+        r = bp.get()
+        self.assertEqual(r, None)
+
+        bp.dump()
+
+        r = bp.format({})
+        self.assertEqual(r, None)
+
+        # do nothing
+        bp.save({}, "test.out")
+
+
+
 class TestFreeRADIUSParser(unittest.TestCase):
 
     def setUp(self):
@@ -548,6 +564,19 @@ class TestFreeRADIUSUsers(unittest.TestCase):
         print output
 
         self.assertEqual(output, FILEOUTPUT_USER_ORIG)
-    
-if __name__ == '__main__':
-    unittest.main()
+
+    def test_read_user_from_file(self):
+        UP = UserConfParser(infile="./testdata/users")
+        config = UP.get()
+        user1 = config[0]
+        user2 = config[1]
+        self.assertEqual(user1[0], "administrator")
+        self.assertEqual(user2[0], "DEFAULT")
+
+        # Just dump it
+        UP.dump()
+
+    def test_read_clients_from_file(self):
+        CP = ClientConfParser(infile="./testdata/clients.conf")
+        config = CP.get()
+        self.assertEqual(len(config), 2)
