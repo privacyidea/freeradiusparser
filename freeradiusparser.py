@@ -8,7 +8,6 @@ from pyparsing import pythonStyleComment, Regex
 
 class BaseParser(object):
 
-
     def get(self):
         """
         return the grouped config
@@ -31,7 +30,7 @@ class BaseParser(object):
     def dump(self):
         conf = self.get() or {}
         for client in conf:
-            print "%s: %s" % (client[0], client[1])
+            print("%s: %s" % (client[0], client[1]))
 
     def format(self, dict_config):
         '''
@@ -54,7 +53,7 @@ class ClientConfParser(BaseParser):
     client_key = Word(alphanums + "-_/.:")
     space = White().suppress()
     value = CharsNotIn("{}\n# ")
-    comment = ("#")
+    comment = "#"
     assignment = (key
                   + Optional(space)
                   + Literal("=").suppress()
@@ -108,9 +107,9 @@ class ClientConfParser(BaseParser):
         '''
         output = ""
         output += self.file_header
-        for client, attributes in dict_config.iteritems():
+        for client, attributes in dict_config.items():
             output += "client %s {\n" % client
-            for k, v in attributes.iteritems():
+            for k, v in attributes.items():
                 output += "    %s = %s\n" % (k, v)
             output += "}\n\n"
         return output
@@ -122,9 +121,9 @@ class UserConfParser(BaseParser):
     username = Word(alphanums + "@_.-/")
     client_key = Word(alphanums + "-_/.:")
     space = White().suppress()
-    comma = (",")
+    comma = ","
     value = CharsNotIn("{}\n#, ")
-    comment = ("#")
+    comment = "#"
     # operator = ":="
     operator = Regex(":=|==|=|\+=|!=|>|>=|<|<=|=~|!~|=\*|!\*")
     assignment = Group(space
@@ -196,4 +195,3 @@ class UserConfParser(BaseParser):
                     output += "\n"
             output += "\n"
         return output
-        

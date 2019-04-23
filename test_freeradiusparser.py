@@ -21,7 +21,7 @@ import logging
 log = logging.getLogger(__name__)
 import unittest
 import os
-from freeradiusparser import ClientConfParser, UserConfParser, BaseParser
+from .freeradiusparser import ClientConfParser, UserConfParser, BaseParser
 
 CLIENT_CONF = """# This is a client.conf for freeradius
 client localhost {
@@ -39,7 +39,7 @@ client private-network-1 {
 }
 """
 
-CLIENT_CONF_ORIG="""#
+CLIENT_CONF_ORIG = """#
 # clients.conf - client configuration directives
 #
 #######################################################################
@@ -423,7 +423,6 @@ class TestBaseParser(unittest.TestCase):
         bp.save({}, "test.out")
 
 
-
 class TestFreeRADIUSParser(unittest.TestCase):
 
     def setUp(self):
@@ -432,7 +431,7 @@ class TestFreeRADIUSParser(unittest.TestCase):
     def test_clients_conf_simple(self):
         CP = ClientConfParser(content=CLIENT_CONF)
         config = CP.get_dict()
-        print config
+        print(config)
         self.assertTrue("localhost" in config)
         self.assertTrue("private-network-1" in config)
         self.assertEqual(config.get("private-network-1").get("secret"),
@@ -443,7 +442,7 @@ class TestFreeRADIUSParser(unittest.TestCase):
     def test_clients_conf_original(self):
         CP = ClientConfParser(content=CLIENT_CONF_ORIG)
         config = CP.get_dict()
-        print config
+        print(config)
         # {'127.0.0.1': {'secret': 'testing123', 'shortname': 'localhost',
         # 'nastype': 'other    '}}
         self.assertTrue("localhost" not in config)
@@ -454,20 +453,20 @@ class TestFreeRADIUSParser(unittest.TestCase):
                          "other")
         
         output = CP.format(config)
-        print output
+        print(output)
         self.assertEqual(output, FILEOUTPUT_ORIG)
         
     def test_save_file(self):
         tmpfile = "./tmp-output"
         CP = ClientConfParser(content=CLIENT_CONF_ORIG)
         config = CP.get_dict()
-        print config
+        print(config)
         CP.save(config, tmpfile)
         f = open(tmpfile, "r")
         output = f.read()
         f.close()
         os.unlink(tmpfile)
-        print output
+        print(output)
 
         self.assertEqual(output, FILEOUTPUT_ORIG)
         
@@ -480,7 +479,7 @@ class TestFreeRADIUSUsers(unittest.TestCase):
     def test_users_basic(self):
         UP = UserConfParser(content=USER_CONF_A)
         config = UP.get()
-        print config
+        print(config)
         self.assertEqual(config[0][0], "DEFAULT")
         self.assertEqual(config[0][1], "Auth-Type")
         self.assertEqual(config[0][2], ":=")
@@ -489,7 +488,7 @@ class TestFreeRADIUSUsers(unittest.TestCase):
     def test_users_password(self):
         UP = UserConfParser(content=USER_CONF_B)
         config = UP.get()
-        print config
+        print(config)
         self.assertEqual(config[0][0], "administrator")
         self.assertEqual(config[0][1], "Cleartext-Password")
         self.assertEqual(config[0][2], ":=")
@@ -498,7 +497,7 @@ class TestFreeRADIUSUsers(unittest.TestCase):
     def test_operators(self):
         UP = UserConfParser(content=USER_CONF_C)
         config = UP.get()
-        print config
+        print(config)
         self.assertEqual(config[0][0], "user")
         self.assertEqual(config[0][1], "somekey")
         self.assertEqual(config[0][2], "==")
@@ -507,7 +506,7 @@ class TestFreeRADIUSUsers(unittest.TestCase):
     def test_reply_items(self):
         UP = UserConfParser(content=USER_CONF_D)
         config = UP.get()
-        print config
+        print(config)
         # [['DEFAULT', 'Hint', '==', '"SLIP"',
         #  [['Framed-Protocol', '=', 'SLIP']]]
         # ]
@@ -523,7 +522,7 @@ class TestFreeRADIUSUsers(unittest.TestCase):
     def test_reply_items2(self):
         UP = UserConfParser(content=USER_CONF_E)
         config = UP.get()
-        print config
+        print(config)
         # [['DEFAULT', 'Hint', '==', '"SLIP"',
         #  [['Framed-Protocol', '=', 'SLIP']]]
         # ]
@@ -542,11 +541,11 @@ class TestFreeRADIUSUsers(unittest.TestCase):
     def test_get_complete(self):
         UP = UserConfParser(content=USER_CONF_1)
         config = UP.get()
-        print len(config)
+        print(len(config))
         self.assertEqual(len(config), 3)
-        print config[0]
-        print config[1]
-        print config[2]
+        print(config[0])
+        print(config[1])
+        print(config[2])
         self.assertEqual(len(config[0][4]), 2)
         self.assertEqual(len(config[1][4]), 2)
         self.assertEqual(len(config[2][4]), 1)
@@ -555,13 +554,13 @@ class TestFreeRADIUSUsers(unittest.TestCase):
         tmpfile = "./tmp-output"
         UP = UserConfParser(content=USER_CONF_1)
         config = UP.get()
-        print config
+        print(config)
         UP.save(config, tmpfile)
         f = open(tmpfile, "r")
         output = f.read()
         f.close()
         os.unlink(tmpfile)
-        print output
+        print(output)
 
         self.assertEqual(output, FILEOUTPUT_USER_ORIG)
 
