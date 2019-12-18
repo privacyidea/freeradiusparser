@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import codecs
+import six
 
-from pyparsing import Literal, White, Word, alphanums, CharsNotIn
-from pyparsing import Forward, Group, Optional, OneOrMore, ZeroOrMore
-from pyparsing import pythonStyleComment, Regex
+from pyparsing import (Literal, White, Word, alphanums, CharsNotIn, printables,
+                       Forward, Group, OneOrMore, ZeroOrMore,
+                       Suppress, pythonStyleComment, Regex)
 
 
 class BaseParser(object):
@@ -13,24 +14,18 @@ class BaseParser(object):
         return the grouped config
         """
         return
-    
+
     def get_dict(self):
-        '''
-        return the client config as a dictionary.
-        '''
-        ret = {}
-        config = self.get()
-        for client in config:
-            client_config = {}
-            for attribute in client[1]:
-                client_config[attribute[0]] = attribute[1]
-            ret[client[0]] = client_config
-        return ret
-    
+        """
+        return the parsed data as a dictionary
+        """
+        return
+
     def dump(self):
-        conf = self.get() or {}
-        for client in conf:
-            print("%s: %s" % (client[0], client[1]))
+        """
+        dump the data to stdout
+        """
+        return
 
     def format(self, dict_config):
         '''
@@ -48,30 +43,25 @@ class BaseParser(object):
 
 
 class ClientConfParser(BaseParser):
-
     key = Word(alphanums + "_")
     client_key = Word(alphanums + "-_/.:")
+    LBRACE, RBRACE, EQUALS, HASH = map(Suppress, '{}=#')
     space = White().suppress()
-    value = CharsNotIn("{}\n# ")
-    comment = "#"
-    assignment = (key
-                  + Optional(space)
-                  + Literal("=").suppress()
-                  + Optional(space)
-                  + value
-                  + Optional(space)
-                  + Optional("#"))
+    value = Word(printables, excludeChars='{}\n# \t')
+    assignment = Group(key + EQUALS + value)
+    intern_section = (LBRACE
+                      + ZeroOrMore(assignment)
+                      + RBRACE)
+    named_section = Group(key + Group(intern_section))
+    sections = Group(key + Group(intern_section | named_section))
     client_block = Forward()
-    client_block << Group((Literal("client").suppress()
-                          + space
-                          + client_key)
-                          + Literal("{").suppress()
-                          + Group(ZeroOrMore(Group(assignment)))
-                          + Literal("}").suppress()
-                          )
-    
+    client_block << Group(Literal("client").suppress()
+                          + client_key
+                          + LBRACE
+                          + Group(ZeroOrMore(assignment ^ sections))
+                          + RBRACE)
     client_file = OneOrMore(client_block).ignore(pythonStyleComment)
-    
+
     file_header = """# File parsed and saved by privacyidea.\n\n"""
     
     def __init__(self,
@@ -101,18 +91,72 @@ class ClientConfParser(BaseParser):
         config = self.client_file.parseString(self.content)
         return config
     
+    def get_dict(self):
+        '''
+        return the client config as a dictionary.
+        '''
+        ret = {}
+        config = self.get()
+        for client in config:
+            client_key = client.pop(0)
+            client_config = {}
+            for attribute in client:
+                client_config.update(ClientConfParser._parse_entry(attribute))
+            ret[client_key] = client_config
+        return ret
+
+    def dump(self):
+        conf = self.get() or {}
+        for client in conf:
+            print("%s: %s" % (client[0], client[1]))
+
     def format(self, dict_config):
         '''
         :return: The formatted data as it would be written to a file
         '''
-        output = ""
+        output = u""
         output += self.file_header
         for client, attributes in dict_config.items():
-            output += "client %s {\n" % client
-            for k, v in attributes.items():
-                output += "    %s = %s\n" % (k, v)
-            output += "}\n\n"
+            output += u"client %s {\n" % client
+            output += ClientConfParser._format_entry(attributes)
+            output += u"}\n\n"
         return output
+
+    @staticmethod
+    def _parse_entry(e):
+        if isinstance(e, six.text_type):
+            return e
+        if isinstance(e, six.string_types):  # pragma: no cover
+            return e.decode()
+        if len(e) == 0:
+            return {}
+        return {k: ClientConfParser._parse_entry(v) for k, v in e}
+
+    @staticmethod
+    def _format_entry(e, s=False, lvl=4):
+        ret = ''
+        if len(e) == 0 and s:
+            ret += u' {\n'
+        for k, v in e.items():
+            if isinstance(v, dict):
+                if s:
+                    ret += u' {0!s} {{\n'.format(k) \
+                           + ClientConfParser._format_entry(v, s=False,
+                                                            lvl=lvl)
+                else:
+                    ret += u' ' * lvl + u'{0!s}'.format(k) \
+                           + ClientConfParser._format_entry(v, s=True,
+                                                            lvl=lvl + 4) \
+                           + u' ' * lvl + u'}\n'
+            elif isinstance(v, six.string_types):
+                if s:
+                    ret += u' {\n'
+                    s = False
+                ret += u' ' * lvl + u'{0!s} = {1!s}\n'.format(k, v)
+            else:  # pragma: no cover
+                print('Error formatting freeradius client entry: '
+                      'Unknown type: ' + str(type(v)) + ' ' + str(e))
+        return ret
 
 
 class UserConfParser(BaseParser):
@@ -125,7 +169,7 @@ class UserConfParser(BaseParser):
     value = CharsNotIn("{}\n#, ")
     comment = "#"
     # operator = ":="
-    operator = Regex(":=|==|=|\+=|!=|>|>=|<|<=|=~|!~|=\*|!\*")
+    operator = Regex(r":=|==|=|\+=|!=|>|>=|<|<=|=~|!~|=\*|!\*")
     assignment = Group(space
                        + key
                        + space.suppress()
@@ -174,7 +218,13 @@ class UserConfParser(BaseParser):
         """
         config = self.user_file.parseString(self.content)
         return config
-    
+
+    def get_dict(self):
+        pass
+
+    def dump(self):
+        pass
+
     def format(self, config):
         '''
         :return: The formatted data as it would be written to a file
