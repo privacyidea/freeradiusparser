@@ -20,17 +20,19 @@
 import unittest
 import os
 import pytest
+import json
+from collections import OrderedDict
 from six.moves.urllib.request import urlopen
 from .freeradiusparser import ClientConfParser, UserConfParser, BaseParser
 
 SIMPLE_CLIENTS_CONF_TEST_FILE = 'testdata/clients.conf'
-FILEOUTPUT_SIMPLE_CLIENTS_CONF = """# File parsed and saved by privacyidea.
+FILEOUTPUT_SIMPLE_CLIENTS_CONF = u"""# File parsed and saved by privacyidea.
 
 client localhost {
     ipaddr = 127.0.0.1
+    nastype = other
     secret = testing123
     shortname = localhost
-    nastype = other
 }
 
 client private-network-1 {
@@ -43,21 +45,67 @@ client private-network-1 {
 """
 
 CLIENTS_CONF_TEST_FILE = 'testdata/test_clients.conf'
+FILEOUTPUT_CLIENTS_CONF_TEST = u"""# File parsed and saved by privacyidea.
+
+client 127.0.0.1 {
+    limit {
+        lifetime = 0
+    }
+    nastype = other
+    secret = testing123
+    shortname = localhost
+}
+
+client 127.0.0.2 {
+    limit {
+    }
+    nastype = other
+    secret = testing123
+    shortname = localhost
+}
+
+client 127.0.0.3 {
+    limit foo {
+        lifetime = 0
+    }
+    nastype = other
+    secret = testing123
+    shortname = localhost
+}
+
+client 127.0.0.4 {
+    limit foo {
+    }
+    nastype = other
+    secret = testing123
+    shortname = localhost
+}
+
+client foo {
+    limit baz {
+        lifetime = 1
+    }
+    nastype = other
+    secret = testing123
+    shortname = bar
+}
+
+"""
 
 CLIENTS_CONF_RAD30_FILE = 'testdata/rad30_clients.conf'
-FILEOUTPUT_RAD30 = """# File parsed and saved by privacyidea.
+FILEOUTPUT_RAD30 = u"""# File parsed and saved by privacyidea.
 
 client localhost {
     ipaddr = 127.0.0.1
-    proto = *
-    secret = testing123
-    require_message_authenticator = no
-    nas_type = other
     limit {
-        max_connections = 16
-        lifetime = 0
         idle_timeout = 30
+        lifetime = 0
+        max_connections = 16
     }
+    nas_type = other
+    proto = *
+    require_message_authenticator = no
+    secret = testing123
 }
 
 client localhost_ipv6 {
@@ -68,18 +116,18 @@ client localhost_ipv6 {
 """
 
 CLIENTS_CONF_CURRENT_URL = 'https://raw.githubusercontent.com/FreeRADIUS/freeradius-server/master/raddb/clients.conf'
-FILEOUTPUT_CURRENT = """# File parsed and saved by privacyidea.
+FILEOUTPUT_CURRENT = u"""# File parsed and saved by privacyidea.
 
 client localhost {
     ipaddr = 127.0.0.1
-    proto = *
-    secret = testing123
-    require_message_authenticator = no
     limit {
-        max_connections = 16
-        lifetime = 0
         idle_timeout = 30
+        lifetime = 0
+        max_connections = 16
     }
+    proto = *
+    require_message_authenticator = no
+    secret = testing123
 }
 
 client localhost_ipv6 {
@@ -115,7 +163,7 @@ DEFAULT    Hint == "SLIP"
 USER_CONF_RAD30_FILE = 'testdata/users_rad30'
 USER_CONF_CURRENT_URL = 'https://raw.githubusercontent.com/FreeRADIUS/freeradius-server/v3.0.x/raddb/mods-config/files/authorize'
 
-FILEOUTPUT_USER_ORIG = """# File parsed and saved by privacyidea.
+FILEOUTPUT_USER_ORIG = u"""# File parsed and saved by privacyidea.
 
 DEFAULT Framed-Protocol == PPP
 \tFramed-Protocol = PPP,
@@ -142,6 +190,8 @@ class TestBaseParser(unittest.TestCase):
         bp = BaseParser()
         r = bp.get()
         self.assertEqual(r, None)
+        r2 = bp.get_dict()
+        assert r2 is None
         bp.dump()
         captured = self.capsys.readouterr()
         assert captured.out == ''
@@ -155,6 +205,10 @@ class TestBaseParser(unittest.TestCase):
 
 class TestFreeRADIUSParser(unittest.TestCase):
 
+    @pytest.fixture(autouse=True)
+    def capsys(self, capsys):
+        self.capsys = capsys
+
     def setUp(self):
         pass
     
@@ -167,14 +221,21 @@ class TestFreeRADIUSParser(unittest.TestCase):
                          "testing123-1")
         self.assertEqual(config.get("private-network-1").get("shortname"),
                          "private-network-1")
-        
+
+    def test_clients_conf_simple_dump(self):
+        cp = ClientConfParser(infile='testdata/clients.conf')
+        cp.dump()
+        captured = self.capsys.readouterr()
+        assert "private-network-1: [[" in captured.out
+        assert "testing123-1']," in captured.out
+
     def test_clients_conf_current_from_github(self):
         # load the raw clients.conf from the freeRADIUS github page
         # and compare it with a local version. This way we know if something
         # changed in the original
         try:
             response = urlopen(CLIENTS_CONF_CURRENT_URL)
-        except RuntimeError as e:
+        except RuntimeError as e:  # pragma: no cover
             print(e)
             pytest.xfail('Could not get data from net!')
 
@@ -188,28 +249,44 @@ class TestFreeRADIUSParser(unittest.TestCase):
                          "testing123")
         self.assertEqual(config.get("localhost").get("ipaddr"),
                          "127.0.0.1")
-        
-        output = CP.format(config)
-        self.assertEqual(output, FILEOUTPUT_CURRENT)
+        assert config['localhost']['limit']['max_connections'] == '16'
+        # this is a dirty hack to get reproducible results
+        cfg = json.loads(json.dumps(config, sort_keys=True),
+                         object_pairs_hook=OrderedDict)
+        assert CP.format(cfg) == FILEOUTPUT_CURRENT
         
     def test_clients_conf_original_freerad30(self):
         cp = ClientConfParser(infile=CLIENTS_CONF_RAD30_FILE)
         config = cp.get_dict()
         self.assertIn('localhost', config, config)
         self.assertIn('localhost_ipv6', config, config)
-        assert cp.format(config) == FILEOUTPUT_RAD30
+        # this is a dirty hack to get reproducible results
+        cfg = json.loads(json.dumps(config, sort_keys=True),
+                         object_pairs_hook=OrderedDict)
+        assert cp.format(cfg) == FILEOUTPUT_RAD30
 
     def test_clients_conf_with_sections(self):
         cp = ClientConfParser(infile=CLIENTS_CONF_TEST_FILE)
         config = cp.get_dict()
-        fmt = cp.format(config)
-        # TODO: check sections
+        assert 'foo' in config
+        assert 'lifetime' in config['127.0.0.1']['limit']
+        assert len(config['127.0.0.2']['limit']) == 0
+        assert 'lifetime' in config['127.0.0.3']['limit']['foo']
+        assert isinstance(config['127.0.0.4']['limit']['foo'], dict)
+        assert len(config['127.0.0.4']['limit']['foo']) == 0
+        # this is a dirty hack to get reproducible results
+        cfg = json.loads(json.dumps(config, sort_keys=True),
+                         object_pairs_hook=OrderedDict)
+        assert cp.format(cfg) == FILEOUTPUT_CLIENTS_CONF_TEST
 
     def test_save_file(self):
         tmpfile = "./tmp-output"
         CP = ClientConfParser(infile=SIMPLE_CLIENTS_CONF_TEST_FILE)
         config = CP.get_dict()
-        CP.save(config, tmpfile)
+        # this is a dirty hack to get reproducible results
+        cfg = json.loads(json.dumps(config, sort_keys=True),
+                         object_pairs_hook=OrderedDict)
+        CP.save(cfg, tmpfile)
         f = open(tmpfile, "r")
         output = f.read()
         f.close()
@@ -218,7 +295,11 @@ class TestFreeRADIUSParser(unittest.TestCase):
         
 
 class TestFreeRADIUSUsers(unittest.TestCase):
-    
+
+    @pytest.fixture(autouse=True)
+    def capsys(self, capsys):
+        self.capsys = capsys
+
     def setUp(self):
         pass
     
@@ -229,7 +310,10 @@ class TestFreeRADIUSUsers(unittest.TestCase):
         self.assertEqual(config[0][1], "Auth-Type")
         self.assertEqual(config[0][2], ":=")
         self.assertEqual(config[0][3], "perl")
-        
+        # get_dict isn't implemented
+        r1 = UP.get_dict()
+        assert r1 is None
+
     def test_users_password(self):
         UP = UserConfParser(content=USER_CONF_B)
         config = UP.get()
@@ -306,13 +390,15 @@ class TestFreeRADIUSUsers(unittest.TestCase):
         self.assertEqual(user1[0], "administrator")
         self.assertEqual(user2[0], "DEFAULT")
 
-        # Just dump it
+        # Just dump it, dump() currently does nothing
         UP.dump()
+        captured = self.capsys.readouterr()
+        assert captured.out == ''
 
     def test_current_user_config_from_github(self):
         try:
             response = urlopen(USER_CONF_CURRENT_URL)
-        except RuntimeError as e:
+        except RuntimeError as e:  # pragma: no cover
             print(e)
             pytest.xfail('Could not get data from net!')
 

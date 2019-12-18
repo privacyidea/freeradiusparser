@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import codecs
+import six
 
 from pyparsing import (Literal, White, Word, alphanums, CharsNotIn, printables,
                        Forward, Group, OneOrMore, ZeroOrMore,
@@ -113,18 +114,20 @@ class ClientConfParser(BaseParser):
         '''
         :return: The formatted data as it would be written to a file
         '''
-        output = ""
+        output = u""
         output += self.file_header
         for client, attributes in dict_config.items():
-            output += "client %s {\n" % client
+            output += u"client %s {\n" % client
             output += ClientConfParser._format_entry(attributes)
-            output += "}\n\n"
+            output += u"}\n\n"
         return output
 
     @staticmethod
     def _parse_entry(e):
-        if isinstance(e, str):
+        if isinstance(e, six.text_type):
             return e
+        if isinstance(e, six.string_types):  # pragma: no cover
+            return e.decode()
         if len(e) == 0:
             return {}
         return {k: ClientConfParser._parse_entry(v) for k, v in e}
@@ -133,24 +136,26 @@ class ClientConfParser(BaseParser):
     def _format_entry(e, s=False, lvl=4):
         ret = ''
         if len(e) == 0 and s:
-            ret += ' {\n'
+            ret += u' {\n'
         for k, v in e.items():
             if isinstance(v, dict):
                 if s:
-                    ret += ' {0!s} {{\n'.format(k) \
-                           + ClientConfParser._format_entry(v, s=False, lvl=lvl)
+                    ret += u' {0!s} {{\n'.format(k) \
+                           + ClientConfParser._format_entry(v, s=False,
+                                                            lvl=lvl)
                 else:
-                    ret += ' ' * lvl + '{0!s}'.format(k) \
-                           + ClientConfParser._format_entry(v, s=True, lvl=lvl + 4) \
-                           + ' ' * lvl + '}\n'
-            elif isinstance(v, str):
+                    ret += u' ' * lvl + u'{0!s}'.format(k) \
+                           + ClientConfParser._format_entry(v, s=True,
+                                                            lvl=lvl + 4) \
+                           + u' ' * lvl + u'}\n'
+            elif isinstance(v, six.string_types):
                 if s:
-                    ret += ' {\n'
+                    ret += u' {\n'
                     s = False
-                ret += ' ' * lvl + '{0!s} = {1!s}\n'.format(k, v)
+                ret += u' ' * lvl + u'{0!s} = {1!s}\n'.format(k, v)
             else:  # pragma: no cover
                 print('Error formatting freeradius client entry: '
-                      'Unknown type: ' + type(v) + ' ' + e)
+                      'Unknown type: ' + str(type(v)) + ' ' + str(e))
         return ret
 
 
