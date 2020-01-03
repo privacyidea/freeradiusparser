@@ -1,6 +1,7 @@
-[report]
+[run]
 omit =
+    setup.py
 
+[report]
 exclude_lines =
     pragma: no cover
-    except Exception
