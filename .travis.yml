@@ -3,14 +3,14 @@ sudo: false
 python:
   - 2.7
   - 3.6
+
 # command to install dependencies
 install:
-  - "pip install ."
-  - "pip install pytest"
-  - "pip install pytest-cov"
+  - "pip install tox-travis"
   - "pip install coveralls"
+
 # command to run tests
-script: "python -b -m pytest --cov-report=html --cov=freeradiusparser"
+script: "tox"
 
 after_success:
     coveralls --rcfile=coveragerc
